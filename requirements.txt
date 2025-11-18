@@ -1,0 +1,11 @@
+langchain
+langchain-huggingface
+langchain-ollama
+langchain-chroma
+langchain-community
+sentence-transformers
+chromadb
+pypdf
+streamlit
+cryptography
+reportlab
