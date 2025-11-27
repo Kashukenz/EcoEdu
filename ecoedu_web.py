@@ -60,8 +60,7 @@ def is_environmental_query(query: str) -> bool:
         "recipe", "cooking", "movie", "music", "celebrity", "sports team",
         "programming", "code", "javascript", "python tutorial", "css",
         "celebrity gossip", "tv show", "anime", "manga", "video game",
-        "fashion", "makeup", "hairstyle", "workout routine", "diet plan",
-        "politics", "president"
+        "fashion", "makeup", "hairstyle", "workout routine", "diet plan"
     ]
 
     # Check for explicit non-environmental queries
@@ -184,9 +183,9 @@ def initialize_rag_system():
 
         # Create retriever with better parameters for finding penalties/specifics
         retriever = vector_store.as_retriever(
-            search_type="similarity",  # Changed from mmr - simpler and more direct
+            search_type="similarity",  # Direct similarity search
             search_kwargs={
-                "k": 10,  # Retrieve more chunks to find penalties
+                "k": 12,  # More chunks for better coverage
             }
         )
 
@@ -198,7 +197,15 @@ def initialize_rag_system():
 
 Question: {input}
 
-Provide a clear, direct answer. Never mention "context", "documents", "knowledge base", or "database". Answer naturally as if you simply know the information.""")
+CRITICAL INSTRUCTIONS:
+1. If something is PROHIBITED or has PENALTIES, it IS ILLEGAL. Never say "not prohibited" then mention penalties.
+2. State penalties EXACTLY as given - don't round or estimate numbers.
+3. Match the user's language (English/Tagalog).
+4. For "bawal ba?" questions: Start with "Oo, bawal" (yes, prohibited) or "Hindi, pwede" (no, it's allowed).
+5. Never mention "context", "documents", or "knowledge base".
+6. Cite specific laws (RA 8749, RA 9003) and sections when available.
+
+Answer naturally and directly:""")
         ])
 
         question_answer_chain = create_stuff_documents_chain(llm, prompt_template)
@@ -310,15 +317,21 @@ if prompt := st.chat_input("Ask EcoEdu about environmental topics..."):
 
                 # Show sources in expander
                 if response.get('context'):
-                    with st.expander("📚 View Sources"):
+                    with st.expander("📚 View Sources (Debug)"):
                         sources_seen = set()
                         for i, doc in enumerate(response['context']):
                             source_name = os.path.basename(doc.metadata.get('source', 'Unknown'))
-                            if source_name not in sources_seen:
-                                st.caption(f"📄 {source_name}")
-                                sources_seen.add(source_name)
-                            # Show snippet
-                            st.text(doc.page_content[:200] + "...")
+                            page = doc.metadata.get('page', 'Unknown')
+
+                            # Show each chunk with more detail
+                            st.caption(f"**Chunk {i + 1}** - {source_name} (Page {page})")
+                            st.text_area(
+                                f"Content {i + 1}:",
+                                doc.page_content,
+                                height=100,
+                                key=f"chunk_{i}",
+                                disabled=True
+                            )
                             st.divider()
 
                 answer = response['answer']
