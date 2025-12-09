@@ -189,7 +189,7 @@ def initialize_rag_system():
             }
         )
 
-        # Create prompt template
+        # Create prompt template with language detection
         prompt_template = ChatPromptTemplate.from_messages([
             ("human",
              """Context:
@@ -198,12 +198,15 @@ def initialize_rag_system():
 Question: {input}
 
 CRITICAL INSTRUCTIONS:
-1. If something is PROHIBITED or has PENALTIES, it IS ILLEGAL. Never say "not prohibited" then mention penalties.
-2. State penalties EXACTLY as given - don't round or estimate numbers.
-3. Match the user's language (English/Tagalog).
-4. For "bawal ba?" questions: Start with "Oo, bawal" (yes, prohibited) or "Hindi, pwede" (no, it's allowed).
-5. Never mention "context", "documents", or "knowledge base".
-6. Cite specific laws (RA 8749, RA 9003) and sections when available.
+1. MATCH THE LANGUAGE: If the question is in English, answer in ENGLISH. If in Tagalog, answer in TAGALOG.
+   - "How do I..." / "What is..." / "Can I..." = ENGLISH question → Answer in ENGLISH
+   - "Paano..." / "Ano ang..." / "Pwede ba..." = TAGALOG question → Answer in TAGALOG
+2. NO META-TALK: Never say "according to the information provided", "as stated in", "based on the context". Just answer directly.
+3. If something is PROHIBITED or has PENALTIES, it IS ILLEGAL. Never say "not prohibited" then mention penalties.
+4. State penalties EXACTLY as given - don't round or estimate numbers.
+5. For "bawal ba?" questions: Start with "Oo, bawal" (yes, prohibited) or "Hindi, pwede" (no, it's allowed).
+6. Use natural prose paragraphs, not bullet points unless the answer requires a list.
+7. Cite specific Philippine laws (RA 8749, RA 9003) and sections when available.
 
 Answer naturally and directly:""")
         ])
@@ -298,10 +301,16 @@ if prompt := st.chat_input("Ask EcoEdu about environmental topics..."):
         tagalog_indicators = ["ano", "paano", "saan", "sino", "kailan", "bakit", "pwede", "pano", "gawa", "mag"]
         is_tagalog = any(indicator in prompt_lower for indicator in tagalog_indicators)
 
-        if is_tagalog:
-            refusal_text = "Espesyalista ako sa mga paksa tungkol sa kapaligiran ng Pilipinas. Makakatulong ako sa mga tanong tungkol sa pagbabago ng klima, biodiversity, pag-recycle, sustainability, polusyon, at mga batas pangkapaligiran. Pwede po bang magtanong tungkol sa mga paksang ito?"
+        # Check if it's a harmful query
+        harmful_indicators = ["remove my family", "kill", "harm", "suicide", "murder"]
+        is_harmful = any(indicator in prompt_lower for indicator in harmful_indicators)
+
+        if is_harmful:
+            refusal_text = "I cannot provide that information."
+        elif is_tagalog:
+            refusal_text = "Makakatulong lang ako sa mga paksa tungkol sa kapaligiran ng Pilipinas. Hindi ako makakatulong sa mga tanong tungkol sa pulitika, celebrities, o ibang paksa."
         else:
-            refusal_text = "I specialize in environmental topics related to the Philippines. I can help you with questions about climate change, biodiversity, recycling, sustainability, pollution, and environmental policies. Could you ask me something about these topics?"
+            refusal_text = "I can only help with environmental topics related to the Philippines. I cannot answer questions about politics, celebrities, technology, or other non-environmental subjects."
 
         with st.chat_message("assistant"):
             st.markdown(refusal_text)
@@ -311,7 +320,7 @@ if prompt := st.chat_input("Ask EcoEdu about environmental topics..."):
 
     # Process environmental queries
     with st.chat_message("assistant"):
-        with st.spinner("Searching through environmental documents..."):
+        with st.spinner("EcoEdu is thinking..."):
             try:
                 response = st.session_state.rag_chain.invoke({"input": prompt})
 
